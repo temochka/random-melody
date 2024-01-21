@@ -292,6 +292,11 @@ view model =
         ]
 
 
+pushUrl : Browser.Navigation.Key -> List Int -> Cmd Msg
+pushUrl navKey melody =
+    Browser.Navigation.pushUrl navKey (Url.Builder.relative [] [ Url.Builder.string "melody" (serializeMelody melody) ])
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -307,7 +312,7 @@ update msg model =
             ( model, Cmd.none )
 
         SetMelody melody ->
-            ( { model | melody = melody }, Browser.Navigation.pushUrl model.navigationKey (Url.Builder.relative [] [ Url.Builder.string "melody" (serializeMelody melody) ]) )
+            ( { model | melody = melody }, pushUrl model.navigationKey melody )
 
         ShiftKeyboardLeft ->
             ( { model | keyboard = shiftKeyboardLeft 1 model.keyboard }, Cmd.none )
@@ -316,12 +321,28 @@ update msg model =
             ( { model | keyboard = shiftKeyboardRight 1 model.keyboard }, Cmd.none )
 
 
+normalizeMelody : List Int -> List Int
+normalizeMelody melody =
+    melody
+        |> List.head
+        |> Maybe.map
+            (\first ->
+                if first == 1 then
+                    melody
+
+                else
+                    List.map (\i -> modBy (List.length defaultKeyboard) (i - first) + 1) melody
+            )
+        |> Maybe.withDefault melody
+
+
 deserialzeMelody : String -> List Int
 deserialzeMelody s =
     s
         |> String.split "-"
         |> List.take 6
         |> List.filterMap String.toInt
+        |> normalizeMelody
 
 
 serializeMelody : List Int -> String
@@ -350,7 +371,7 @@ main =
                   , keyboard = defaultKeyboard
                   , navigationKey = navKey
                   }
-                , Cmd.none
+                , pushUrl navKey melody
                 )
         , view =
             view
