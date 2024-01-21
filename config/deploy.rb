@@ -1,6 +1,6 @@
-lock '3.7.1'
+lock '3.12.1'
 
-set :deploy_to, '/srv/www/random-melody.temochka.com'
+set :deploy_to, ENV.fetch('CAPISTRANO_DEPLOY_TO')
 set :keep_releases, 5
 set :repo_url, 'public'
 set :tarball_exclude, []
