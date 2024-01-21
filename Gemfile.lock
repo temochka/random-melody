@@ -1,0 +1,39 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    airbrussh (1.5.1)
+      sshkit (>= 1.6.1, != 1.7.0)
+    capistrano (3.7.1)
+      airbrussh (>= 1.0.0)
+      capistrano-harrow
+      i18n
+      rake (>= 10.0.0)
+      sshkit (>= 1.9.0)
+    capistrano-harrow (0.5.3)
+    capistrano-tarball_scm (0.2.1)
+      capistrano (>= 3.7.0, < 4.0.0)
+    concurrent-ruby (1.2.3)
+    i18n (1.14.1)
+      concurrent-ruby (~> 1.0)
+    mutex_m (0.2.0)
+    net-scp (4.0.0)
+      net-ssh (>= 2.6.5, < 8.0.0)
+    net-sftp (4.0.0)
+      net-ssh (>= 5.0.0, < 8.0.0)
+    net-ssh (7.2.1)
+    rake (13.1.0)
+    sshkit (1.22.0)
+      mutex_m
+      net-scp (>= 1.1.2)
+      net-sftp (>= 2.1.2)
+      net-ssh (>= 2.8.0)
+
+PLATFORMS
+  arm64-darwin-22
+
+DEPENDENCIES
+  capistrano (= 3.7.1)
+  capistrano-tarball_scm (~> 0.2.0)
+
+BUNDLED WITH
+   2.2.11
