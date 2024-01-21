@@ -197,14 +197,15 @@ renderLeftPanel _ =
             [ Element.Border.solid
             , Element.Border.rounded 5
             , Element.Border.width 1
-            , Element.width (Element.px 35)
+            , Element.width Element.fill
             , Element.height (Element.px 35)
             , Element.Font.color white
             , Element.centerX
+            , Element.padding 5
             ]
     in
     Element.column
-        [ Element.width (Element.fillPortion 1 |> Element.maximum 60), Element.spacing 10 ]
+        [ Element.width Element.fill, Element.spacing 10, Element.padding 5 ]
         [ Element.Input.button attrs
             { onPress = Just ShiftKeyboardRight
             , label = Element.el [ Element.centerX, Element.centerY ] (Element.text "△")
@@ -221,13 +222,9 @@ renderTopPanel model =
     Element.row
         [ Element.width Element.fill, Element.padding 10, Element.spacing 20 ]
         [ Element.column
-            [ Element.Border.solid
-            , Element.Border.width 3
-            , Element.Border.rounded 10
-            , Element.Border.color white
-            , Element.padding 10
-            , Element.Font.color white
+            [ Element.Font.color white
             , Element.height Element.fill
+            , Element.Font.family [ Element.Font.typeface "Impact", Element.Font.sansSerif ]
             ]
             [ Element.text "СЛУЧАЙНАЯ", Element.text "МЕЛОДИЯ" ]
         , model.melody
@@ -237,10 +234,9 @@ renderTopPanel model =
                         [ Element.Border.width 1
                         , Element.Border.color white
                         , Element.Font.color white
-                        , Element.padding 5
+                        , Element.padding 10
                         , Element.Border.rounded 5
                         , Element.width (Element.fillPortion 1)
-                        , Element.height Element.fill
                         ]
                         (Element.el [ Element.centerX, Element.centerY ] (Element.text (String.fromInt step)))
                 )
@@ -249,9 +245,8 @@ renderTopPanel model =
             [ Element.Border.width 1
             , Element.Border.color white
             , Element.Font.color white
-            , Element.padding 5
+            , Element.padding 10
             , Element.Border.rounded 5
-            , Element.height Element.fill
             , Element.width (Element.fillPortion 1)
             , Element.Background.color blue
             ]
@@ -301,7 +296,12 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Generate ->
-            ( model, Random.generate SetMelody (Random.list notesPerMelody (Random.int 1 (List.length defaultKeyboard))) )
+            ( model
+            , Random.generate SetMelody
+                (Random.list (notesPerMelody - 1) (Random.int 1 (List.length defaultKeyboard))
+                    |> Random.map (\l -> 1 :: l)
+                )
+            )
 
         Nop ->
             ( model, Cmd.none )
