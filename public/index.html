@@ -1,13 +1,15 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
+  <meta charset="utf-8">
+  <title>Random Melody</title>
+  <meta name="description" content="Generate a random 6-note melody">
+  <meta name="application-name" content="Random Melody">
 </head>
 <body>
-  <div id="randommelody"></div>
-  <script src="/dist/elm.js"></script>
-  <script>
-
+<div id="randommelody"></div>
+<script src="/dist/elm.js"></script>
+<script>
 var audioPlayer;
 
 function newAudioPlayer() {
@@ -46,6 +48,6 @@ app.ports.sendAudioCommand.subscribe(function(arg) {
       console.error("Unknown message control command:", message);
   }
 });
-  </script>
+</script>
 </body>
 </html>
