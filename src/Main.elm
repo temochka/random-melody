@@ -487,7 +487,7 @@ main =
         , view =
             view
                 >> (\model ->
-                        { title = "Случайная мелодия"
+                        { title = "Random melody"
                         , body = [ Element.layout [ Element.width Element.fill ] model ]
                         }
                    )
