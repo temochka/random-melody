@@ -66,9 +66,14 @@ black =
     Element.rgb 0 0 0
 
 
+blueGlow : Element.Color
+blueGlow =
+    Element.rgb255 235 245 250
+
+
 blue : Element.Color
 blue =
-    Element.rgba 0.3 0.3 0.8 0.4
+    Element.rgb255 170 205 252
 
 
 darkGray : Element.Color
@@ -111,6 +116,7 @@ type SynthState
 type alias Model =
     { melody : List Int
     , keyboard : Keyboard
+    , shift : Int
     , navigationKey : Browser.Navigation.Key
     , synthState : SynthState
     }
@@ -118,15 +124,14 @@ type alias Model =
 
 type Msg
     = Nop
-    | ShiftKeyboardRight
-    | ShiftKeyboardLeft
+    | ShiftKeyboard Int
     | Generate
     | SetMelody (List Int)
     | PlayMelody
 
 
-renderKeyLabel : List (Element.Attribute msg) -> Int -> Element.Element msg
-renderKeyLabel attrs i =
+renderKeyLabel : List (Element.Attribute msg) -> Maybe Int -> Int -> Element.Element msg
+renderKeyLabel attrs playedKey i =
     Element.el
         ([ Element.width (Element.px 30)
          , Element.height (Element.px 30)
@@ -136,14 +141,19 @@ renderKeyLabel attrs i =
          , Element.centerX
          , Element.alignBottom
          , Element.moveUp 30
+         , if playedKey == Just i then
+            Element.Background.color blue
+
+           else
+            Element.Background.color (Element.rgba 255 255 255 0)
          ]
             ++ attrs
         )
         (Element.el [ Element.centerX, Element.centerY ] (Element.text (String.fromInt i)))
 
 
-renderKeyboard : Keyboard -> Dict.Dict Int (List Int) -> Element.Element msg
-renderKeyboard keyboard melody =
+renderKeyboard : Keyboard -> Dict.Dict Int (List Int) -> Maybe Int -> Element.Element msg
+renderKeyboard keyboard melody playedKey =
     let
         adjustedKeyboard =
             Gray :: keyboard ++ [ Gray ]
@@ -178,7 +188,7 @@ renderKeyboard keyboard melody =
                             , Element.Background.color white
                             , Element.spacing 5
                             ]
-                            (List.map (renderKeyLabel []) plays)
+                            (List.map (renderKeyLabel [] playedKey) plays)
 
                     Black ->
                         let
@@ -194,7 +204,7 @@ renderKeyboard keyboard melody =
                                     , Element.spacing 5
                                     , Element.Border.roundEach { topLeft = 0, topRight = 0, bottomLeft = 10, bottomRight = 10 }
                                     ]
-                                    (List.map (renderKeyLabel [ Element.Border.color white, Element.Font.color white ]) plays)
+                                    (List.map (renderKeyLabel [ Element.Border.color white, Element.Font.color white ] playedKey) plays)
                         in
                         Element.el
                             [ Element.width (Element.px 0)
@@ -208,7 +218,7 @@ renderKeyboard keyboard melody =
 
 
 renderLeftPanel : Model -> Element.Element Msg
-renderLeftPanel _ =
+renderLeftPanel model =
     let
         attrs =
             [ Element.Border.solid
@@ -222,14 +232,45 @@ renderLeftPanel _ =
             ]
     in
     Element.column
-        [ Element.width Element.fill, Element.spacing 10, Element.padding 5 ]
+        [ Element.width (Element.px 65), Element.spacing 10, Element.paddingEach { top = 0, bottom = 0, left = 0, right = 5 } ]
         [ Element.Input.button attrs
-            { onPress = Just ShiftKeyboardRight
+            { onPress = Just (ShiftKeyboard 1)
             , label = Element.el [ Element.centerX, Element.centerY ] (Element.text "△")
             }
         , Element.Input.button attrs
-            { onPress = Just ShiftKeyboardLeft
+            { onPress = Just (ShiftKeyboard -model.shift)
+            , label = Element.el [ Element.centerX, Element.centerY ] (Element.text "C")
+            }
+        , Element.Input.button attrs
+            { onPress = Just (ShiftKeyboard -1)
             , label = Element.el [ Element.centerX, Element.centerY ] (Element.text "▽")
+            }
+        ]
+
+
+renderRightPanel : Model -> Element.Element Msg
+renderRightPanel _ =
+    let
+        attrs =
+            [ Element.Border.solid
+            , Element.Border.rounded 5
+            , Element.Border.width 1
+            , Element.width Element.fill
+            , Element.height (Element.px 35)
+            , Element.Font.color white
+            , Element.centerX
+            , Element.padding 5
+            ]
+    in
+    Element.column
+        [ Element.width (Element.px 65), Element.spacing 10, Element.paddingEach { top = 0, bottom = 0, left = 5, right = 0 } ]
+        [ Element.Input.button attrs
+            { onPress = Just Generate
+            , label = Element.el [ Element.centerX, Element.centerY ] (Element.text "NEW")
+            }
+        , Element.Input.button attrs
+            { onPress = Just PlayMelody
+            , label = Element.el [ Element.centerX, Element.centerY ] (Element.text "PLAY")
             }
         ]
 
@@ -237,20 +278,22 @@ renderLeftPanel _ =
 renderTopPanel : Model -> Element.Element Msg
 renderTopPanel model =
     Element.row
-        [ Element.width Element.fill, Element.padding 10, Element.spacing 20 ]
+        [ Element.width Element.fill, Element.spacing 20 ]
         [ Element.column
             [ Element.Font.color white
             , Element.height Element.fill
             , Element.Font.family [ Element.Font.typeface "Impact", Element.Font.sansSerif ]
             ]
-            [ Element.text "СЛУЧАЙНАЯ", Element.text "МЕЛОДИЯ" ]
+            [ Element.text "RANDOM", Element.text "MELODY" ]
         , model.melody
             |> List.map
                 (\step ->
                     Element.el
                         [ Element.Border.width 1
-                        , Element.Border.color white
-                        , Element.Font.color white
+                        , Element.Border.innerGlow blueGlow 1
+                        , Element.Font.color blue
+                        , Element.Font.glow blueGlow 4
+                        , Element.Background.color black
                         , Element.padding 10
                         , Element.Border.rounded 5
                         , Element.width (Element.fillPortion 1)
@@ -258,16 +301,6 @@ renderTopPanel model =
                         (Element.el [ Element.centerX, Element.centerY ] (Element.text (String.fromInt step)))
                 )
             |> Element.row [ Element.width (Element.fillPortion 8), Element.spacing 10, Element.height Element.fill ]
-        , Element.Input.button
-            [ Element.Border.width 1
-            , Element.Border.color white
-            , Element.Font.color white
-            , Element.padding 10
-            , Element.Border.rounded 5
-            , Element.width (Element.fillPortion 1)
-            , Element.Background.color blue
-            ]
-            { onPress = Just Generate, label = Element.el [ Element.centerX, Element.centerY ] (Element.text "♽") }
         ]
 
 
@@ -293,18 +326,30 @@ melodyByNote melody =
 
 view : Model -> Element.Element Msg
 view model =
+    let
+        playedKey =
+            case model.synthState of
+                Playing melody ->
+                    Just (List.length model.melody - List.length melody)
+
+                Stopped ->
+                    Nothing
+    in
     Element.column
         [ Element.width (Element.fill |> Element.minimum 800 |> Element.maximum 960)
         , Element.centerX
         , Element.padding 10
         , Element.Background.color darkGray
-        , Element.Border.roundEach { topLeft = 0, topRight = 0, bottomLeft = 30, bottomRight = 20 }
+        , Element.spacing 10
+        , Element.Border.roundEach { topLeft = 0, topRight = 0, bottomLeft = 20, bottomRight = 20 }
         ]
         [ renderTopPanel model
         , Element.row [ Element.width Element.fill ]
             [ renderLeftPanel model
             , renderKeyboard model.keyboard
                 (melodyByNote model.melody)
+                playedKey
+            , renderRightPanel model
             ]
         ]
 
@@ -331,12 +376,14 @@ update msg model =
         PlayMelody ->
             case model.synthState of
                 Stopped ->
-                    ( model, Cmd.none )
+                    ( { model | synthState = Playing model.melody }
+                    , Task.perform (always PlayMelody) (Task.succeed ())
+                    )
 
                 Playing (i :: rest) ->
                     ( { model | synthState = Playing rest }
                     , Cmd.batch
-                        [ sendAudioCommand ( "play", Just (noteFrequency i) )
+                        [ sendAudioCommand ( "play", Just (noteFrequency (i + model.shift)) )
                         , Task.perform (always PlayMelody) (Process.sleep 500)
                         ]
                     )
@@ -352,11 +399,16 @@ update msg model =
                 ]
             )
 
-        ShiftKeyboardLeft ->
-            ( { model | keyboard = shiftKeyboardLeft 1 model.keyboard }, Cmd.none )
+        ShiftKeyboard dShift ->
+            let
+                keyboard =
+                    if dShift < 0 then
+                        shiftKeyboardLeft -dShift model.keyboard
 
-        ShiftKeyboardRight ->
-            ( { model | keyboard = shiftKeyboardRight 1 model.keyboard }, Cmd.none )
+                    else
+                        shiftKeyboardRight dShift model.keyboard
+            in
+            ( { model | keyboard = keyboard, shift = model.shift + dShift }, Cmd.none )
 
 
 normalizeMelody : List Int -> List Int
@@ -409,8 +461,13 @@ main =
                   , keyboard = defaultKeyboard
                   , navigationKey = navKey
                   , synthState = Stopped
+                  , shift = 0
                   }
-                , pushUrl navKey melody
+                , if List.isEmpty melody then
+                    Cmd.none
+
+                  else
+                    pushUrl navKey melody
                 )
         , view =
             view
