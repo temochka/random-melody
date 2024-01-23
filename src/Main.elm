@@ -376,27 +376,24 @@ update msg model =
         PlayMelody ->
             case model.synthState of
                 Stopped ->
-                    ( { model | synthState = Playing model.melody }
-                    , Task.perform (always PlayMelody) (Task.succeed ())
-                    )
+                    playMelody model.shift model.melody
+                        |> Tuple.mapFirst (\synthState -> { model | synthState = synthState })
 
                 Playing (i :: rest) ->
                     ( { model | synthState = Playing rest }
-                    , Cmd.batch
-                        [ sendAudioCommand ( "play", Just (noteFrequency (i + model.shift)) )
-                        , Task.perform (always PlayMelody) (Process.sleep 500)
-                        ]
+                    , playNote (i + model.shift)
                     )
 
                 Playing [] ->
                     ( { model | synthState = Stopped }, sendAudioCommand ( "stop", Nothing ) )
 
         SetMelody melody ->
-            ( { model | melody = melody, synthState = Playing melody }
-            , Cmd.batch
-                [ pushUrl model.navigationKey melody
-                , Task.perform (always PlayMelody) (Task.succeed ())
-                ]
+            let
+                ( synthState, cmd ) =
+                    playMelody model.shift melody
+            in
+            ( { model | melody = melody, synthState = synthState }
+            , Cmd.batch [ cmd, pushUrl model.navigationKey melody ]
             )
 
         ShiftKeyboard dShift ->
@@ -409,6 +406,24 @@ update msg model =
                         shiftKeyboardRight dShift model.keyboard
             in
             ( { model | keyboard = keyboard, shift = model.shift + dShift }, Cmd.none )
+
+
+playMelody : Int -> List Int -> ( SynthState, Cmd Msg )
+playMelody shift melody =
+    case melody of
+        note :: rest ->
+            ( Playing rest, playNote (note + shift) )
+
+        [] ->
+            ( Stopped, Cmd.none )
+
+
+playNote : Int -> Cmd Msg
+playNote note =
+    Cmd.batch
+        [ sendAudioCommand ( "play", Just (noteFrequency note) )
+        , Task.perform (always PlayMelody) (Process.sleep 500)
+        ]
 
 
 normalizeMelody : List Int -> List Int
