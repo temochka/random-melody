@@ -1,4 +1,4 @@
-module Main exposing (..)
+port module Main exposing (main)
 
 import Browser
 import Browser.Navigation
@@ -8,10 +8,15 @@ import Element.Background
 import Element.Border
 import Element.Font
 import Element.Input
+import Process
 import Random
+import Task
 import Url.Builder
-import Url.Parser exposing ((<?>))
+import Url.Parser
 import Url.Parser.Query
+
+
+port sendAudioCommand : ( String, Maybe Float ) -> Cmd msg
 
 
 notesPerMelody : Int
@@ -44,6 +49,11 @@ defaultKeyboard =
     , Black
     , White
     ]
+
+
+noteFrequency : Int -> Float
+noteFrequency i =
+    440 * 2 ^ ((toFloat i - 10) / 12)
 
 
 white : Element.Color
@@ -93,10 +103,16 @@ shiftKeyboardLeft n keyboard =
         shiftKeyboardLeft (n - 1) (List.drop (l - 1) keyboard ++ List.take (l - 1) keyboard)
 
 
+type SynthState
+    = Stopped
+    | Playing (List Int)
+
+
 type alias Model =
     { melody : List Int
     , keyboard : Keyboard
     , navigationKey : Browser.Navigation.Key
+    , synthState : SynthState
     }
 
 
@@ -106,6 +122,7 @@ type Msg
     | ShiftKeyboardLeft
     | Generate
     | SetMelody (List Int)
+    | PlayMelody
 
 
 renderKeyLabel : List (Element.Attribute msg) -> Int -> Element.Element msg
@@ -311,8 +328,29 @@ update msg model =
         Nop ->
             ( model, Cmd.none )
 
+        PlayMelody ->
+            case model.synthState of
+                Stopped ->
+                    ( model, Cmd.none )
+
+                Playing (i :: rest) ->
+                    ( { model | synthState = Playing rest }
+                    , Cmd.batch
+                        [ sendAudioCommand ( "play", Just (noteFrequency i) )
+                        , Task.perform (always PlayMelody) (Process.sleep 500)
+                        ]
+                    )
+
+                Playing [] ->
+                    ( { model | synthState = Stopped }, sendAudioCommand ( "stop", Nothing ) )
+
         SetMelody melody ->
-            ( { model | melody = melody }, pushUrl model.navigationKey melody )
+            ( { model | melody = melody, synthState = Playing melody }
+            , Cmd.batch
+                [ pushUrl model.navigationKey melody
+                , Task.perform (always PlayMelody) (Task.succeed ())
+                ]
+            )
 
         ShiftKeyboardLeft ->
             ( { model | keyboard = shiftKeyboardLeft 1 model.keyboard }, Cmd.none )
@@ -370,6 +408,7 @@ main =
                 ( { melody = melody
                   , keyboard = defaultKeyboard
                   , navigationKey = navKey
+                  , synthState = Stopped
                   }
                 , pushUrl navKey melody
                 )

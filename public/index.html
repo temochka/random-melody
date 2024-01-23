@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+  <div id="randommelody"></div>
+  <script src="/dist/elm.js"></script>
+  <script>
+
+var audioPlayer;
+
+function newAudioPlayer() {
+  var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+  var oscillator = audioCtx.createOscillator();
+  oscillator.type = 'sine';
+  oscillator.start();
+
+  return {context: audioCtx, oscillator: oscillator};
+}
+
+var app = Elm.Main.init({
+    node: document.getElementById('randommelody')
+});
+
+app.ports.sendAudioCommand.subscribe(function(arg) {
+  if (!audioPlayer) {
+    audioPlayer = newAudioPlayer();
+  }
+
+  var message = arg[0];
+  var frequency = arg[1];
+
+  switch (message) {
+    case 'play':
+      audioPlayer.oscillator.connect(audioPlayer.context.destination);
+      audioPlayer.oscillator.frequency.setValueAtTime(frequency, audioPlayer.context.currentTime);
+      break;
+    
+    case 'stop':
+      audioPlayer.oscillator.disconnect();
+      break;
+    
+    default:
+      console.error("Unknown message control command:", message);
+  }
+});
+  </script>
+</body>
+</html>
