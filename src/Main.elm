@@ -8,6 +8,8 @@ import Element.Background
 import Element.Border
 import Element.Font
 import Element.Input
+import Element.Region
+import Html.Attributes
 import Process
 import Random
 import Task
@@ -119,6 +121,7 @@ type alias Model =
     , shift : Int
     , navigationKey : Browser.Navigation.Key
     , synthState : SynthState
+    , showHelp : Bool
     }
 
 
@@ -126,8 +129,9 @@ type Msg
     = Nop
     | ShiftKeyboard Int
     | Generate
-    | SetMelody (List Int)
     | PlayMelody
+    | SetMelody (List Int)
+    | ToggleHelp
 
 
 renderKeyLabel : List (Element.Attribute msg) -> Maybe Int -> Int -> Element.Element msg
@@ -263,7 +267,11 @@ renderRightPanel _ =
             ]
     in
     Element.column
-        [ Element.width (Element.px 65), Element.spacing 10, Element.paddingEach { top = 0, bottom = 0, left = 5, right = 0 } ]
+        [ Element.width (Element.px 65)
+        , Element.height Element.fill
+        , Element.spacing 10
+        , Element.paddingEach { top = 0, bottom = 0, left = 5, right = 0 }
+        ]
         [ Element.Input.button attrs
             { onPress = Just Generate
             , label = Element.el [ Element.centerX, Element.centerY ] (Element.text "NEW")
@@ -271,6 +279,22 @@ renderRightPanel _ =
         , Element.Input.button attrs
             { onPress = Just PlayMelody
             , label = Element.el [ Element.centerX, Element.centerY ] (Element.text "PLAY")
+            }
+        , Element.Input.button
+            [ Element.alignBottom
+            , Element.centerX
+            , Element.width (Element.px 40)
+            , Element.height (Element.px 40)
+            , Element.Border.rounded 20
+            , Element.Border.color white
+            , Element.Border.width 1
+            , Element.Font.color white
+            ]
+            { onPress = Just ToggleHelp
+            , label =
+                Element.el
+                    [ Element.centerX, Element.centerY ]
+                    (Element.text "?")
             }
         ]
 
@@ -283,6 +307,7 @@ renderTopPanel model =
             [ Element.Font.color white
             , Element.height Element.fill
             , Element.Font.family [ Element.Font.typeface "Impact", Element.Font.sansSerif ]
+            , Element.Region.heading 1
             ]
             [ Element.text "RANDOM", Element.text "MELODY" ]
         , model.melody
@@ -302,6 +327,43 @@ renderTopPanel model =
                 )
             |> Element.row [ Element.width (Element.fillPortion 8), Element.spacing 10, Element.height Element.fill ]
         ]
+
+
+renderHelpPopup : Element.Element Msg
+renderHelpPopup =
+    Element.el
+        [ Element.width Element.fill
+        , Element.height Element.fill
+        , Element.Background.color (Element.rgba 0 0 0 0.9)
+        , Element.Border.roundEach { topLeft = 0, topRight = 0, bottomLeft = 20, bottomRight = 20 }
+        , Element.Font.color white
+        , Element.htmlAttribute (Html.Attributes.style "z-index" "100")
+        , Element.inFront
+            (Element.Input.button
+                [ Element.Font.color white
+                , Element.Font.size 50
+                , Element.alignRight
+                , Element.alignTop
+                , Element.moveLeft 30
+                ]
+                { onPress = Just ToggleHelp
+                , label = Element.el [ Element.rotate (degrees 45) ] (Element.text "+")
+                }
+            )
+        ]
+        (Element.textColumn
+            [ Element.padding 50, Element.spacing 10 ]
+            [ Element.paragraph [ Element.Region.heading 2, Element.Font.size 28, Element.Font.bold, Element.paddingXY 0 5 ] [ Element.text "Music challenge!" ]
+            , Element.paragraph [] [ Element.text "• Tap “NEW” to produce a unique 6-note sequence." ]
+            , Element.paragraph [] [ Element.text "• Craft a composition using this sequence, keeping the original note order. Feel free to:" ]
+            , Element.textColumn [ Element.paddingEach { left = 20, right = 0, top = 0, bottom = 0 }, Element.spacing 5 ]
+                [ Element.paragraph [] [ Element.text "• Shift the entire sequence by any number of semitones." ]
+                , Element.paragraph [] [ Element.text "• Change any note's octave." ]
+                , Element.paragraph [] [ Element.text "• Experiment with different note durations." ]
+                , Element.paragraph [] [ Element.text "• If stuck, alter one note by a semitone." ]
+                ]
+            ]
+        )
 
 
 melodyByNote : List Int -> Dict.Dict Int (List Int)
@@ -334,6 +396,13 @@ view model =
 
                 Stopped ->
                     Nothing
+
+        helpPopup =
+            if model.showHelp then
+                renderHelpPopup
+
+            else
+                Element.none
     in
     Element.column
         [ Element.width (Element.fill |> Element.minimum 800 |> Element.maximum 960)
@@ -342,6 +411,7 @@ view model =
         , Element.Background.color darkGray
         , Element.spacing 10
         , Element.Border.roundEach { topLeft = 0, topRight = 0, bottomLeft = 20, bottomRight = 20 }
+        , Element.inFront helpPopup
         ]
         [ renderTopPanel model
         , Element.row [ Element.width Element.fill ]
@@ -406,6 +476,9 @@ update msg model =
                         shiftKeyboardRight dShift model.keyboard
             in
             ( { model | keyboard = keyboard, shift = model.shift + dShift }, Cmd.none )
+
+        ToggleHelp ->
+            ( { model | showHelp = not model.showHelp }, Cmd.none )
 
 
 playMelody : Int -> List Int -> ( SynthState, Cmd Msg )
@@ -477,6 +550,7 @@ main =
                   , navigationKey = navKey
                   , synthState = Stopped
                   , shift = 0
+                  , showHelp = False
                   }
                 , if List.isEmpty melody then
                     Cmd.none
