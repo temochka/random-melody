@@ -263,6 +263,7 @@ renderRightPanel _ =
             , Element.height (Element.px 35)
             , Element.Font.color white
             , Element.centerX
+            , Element.centerY
             , Element.padding 5
             ]
     in
@@ -301,6 +302,14 @@ renderRightPanel _ =
 
 renderTopPanel : Model -> Element.Element Msg
 renderTopPanel model =
+    let
+        labels =
+            if List.length model.melody == notesPerMelody then
+                model.melody |> List.map String.fromInt
+
+            else
+                List.range 1 notesPerMelody |> List.map (always "?")
+    in
     Element.row
         [ Element.width Element.fill, Element.spacing 20 ]
         [ Element.column
@@ -310,9 +319,9 @@ renderTopPanel model =
             , Element.Region.heading 1
             ]
             [ Element.text "RANDOM", Element.text "MELODY" ]
-        , model.melody
+        , labels
             |> List.map
-                (\step ->
+                (\label ->
                     Element.el
                         [ Element.Border.width 1
                         , Element.Border.innerGlow blueGlow 1
@@ -323,7 +332,7 @@ renderTopPanel model =
                         , Element.Border.rounded 5
                         , Element.width (Element.fillPortion 1)
                         ]
-                        (Element.el [ Element.centerX, Element.centerY ] (Element.text (String.fromInt step)))
+                        (Element.el [ Element.centerX, Element.centerY ] (Element.text label))
                 )
             |> Element.row [ Element.width (Element.fillPortion 8), Element.spacing 10, Element.height Element.fill ]
         ]
@@ -516,11 +525,29 @@ normalizeMelody melody =
 
 deserialzeMelody : String -> List Int
 deserialzeMelody s =
-    s
-        |> String.split "-"
-        |> List.take 6
-        |> List.filterMap String.toInt
-        |> normalizeMelody
+    let
+        tokens =
+            String.split "-" s
+                |> List.map
+                    (String.toInt
+                        >> Maybe.andThen
+                            (\i ->
+                                if i < 1 || i > 12 then
+                                    Nothing
+
+                                else
+                                    Just i
+                            )
+                    )
+
+        notes =
+            List.filterMap identity tokens
+    in
+    if List.length tokens == List.length notes && List.length notes == notesPerMelody then
+        normalizeMelody notes
+
+    else
+        []
 
 
 serializeMelody : List Int -> String
