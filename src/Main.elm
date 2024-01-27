@@ -88,26 +88,21 @@ lightGray =
     Element.rgb 0.8 0.8 0.8
 
 
-shiftKeyboardRight : Int -> Keyboard -> Keyboard
-shiftKeyboardRight n keyboard =
-    if n < 1 then
+shiftKeyboard : Int -> Keyboard -> Keyboard
+shiftKeyboard n keyboard =
+    let
+        rightShift =
+            if n < 0 then
+                List.length keyboard + n
+
+            else
+                n
+    in
+    if n == 0 then
         keyboard
 
     else
-        shiftKeyboardRight (n - 1) (List.drop 1 keyboard ++ List.take 1 keyboard)
-
-
-shiftKeyboardLeft : Int -> Keyboard -> Keyboard
-shiftKeyboardLeft n keyboard =
-    if n < 1 then
-        keyboard
-
-    else
-        let
-            l =
-                List.length keyboard
-        in
-        shiftKeyboardLeft (n - 1) (List.drop (l - 1) keyboard ++ List.take (l - 1) keyboard)
+        shiftKeyboard (rightShift - 1) (List.drop 1 keyboard ++ List.take 1 keyboard)
 
 
 type SynthState
@@ -130,7 +125,7 @@ type Msg
     | ShiftKeyboard Int
     | Generate
     | PlayMelody
-    | SetMelody (List Int)
+    | Reset Int (List Int)
     | ToggleHelp
 
 
@@ -433,9 +428,24 @@ view model =
         ]
 
 
-pushUrl : Browser.Navigation.Key -> List Int -> Cmd Msg
-pushUrl navKey melody =
-    Browser.Navigation.pushUrl navKey (Url.Builder.relative [] [ Url.Builder.string "melody" (serializeMelody melody) ])
+pushUrl : Browser.Navigation.Key -> List Int -> Int -> Cmd Msg
+pushUrl navKey melody shift =
+    let
+        melodyParams =
+            if List.isEmpty melody then
+                []
+
+            else
+                [ Url.Builder.string "melody" (serializeMelody melody) ]
+
+        shiftParams =
+            if shift == 0 then
+                []
+
+            else
+                [ Url.Builder.int "shift" shift ]
+    in
+    Browser.Navigation.pushUrl navKey (Url.Builder.relative [] (melodyParams ++ shiftParams))
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -443,9 +453,13 @@ update msg model =
     case msg of
         Generate ->
             ( model
-            , Random.generate SetMelody
-                (Random.list (notesPerMelody - 1) (Random.int 1 (List.length defaultKeyboard))
-                    |> Random.map (\l -> 1 :: l)
+            , Random.generate (\( shift, melody ) -> Reset shift melody)
+                (Random.map2
+                    Tuple.pair
+                    (Random.int -5 6)
+                    (Random.list (notesPerMelody - 1) (Random.int 1 (List.length defaultKeyboard))
+                        |> Random.map (\l -> 1 :: l)
+                    )
                 )
             )
 
@@ -466,25 +480,27 @@ update msg model =
                 Playing [] ->
                     ( { model | synthState = Stopped }, sendAudioCommand ( "stop", Nothing ) )
 
-        SetMelody melody ->
+        Reset shift melody ->
             let
                 ( synthState, cmd ) =
-                    playMelody model.shift melody
+                    playMelody shift melody
+
+                keyboard =
+                    shiftKeyboard shift defaultKeyboard
             in
-            ( { model | melody = melody, synthState = synthState }
-            , Cmd.batch [ cmd, pushUrl model.navigationKey melody ]
+            ( { model | melody = melody, shift = shift, synthState = synthState, keyboard = keyboard }
+            , Cmd.batch [ cmd, pushUrl model.navigationKey melody shift ]
             )
 
         ShiftKeyboard dShift ->
             let
                 keyboard =
-                    if dShift < 0 then
-                        shiftKeyboardLeft -dShift model.keyboard
+                    shiftKeyboard dShift model.keyboard
 
-                    else
-                        shiftKeyboardRight dShift model.keyboard
+                shift =
+                    model.shift + dShift
             in
-            ( { model | keyboard = keyboard, shift = model.shift + dShift }, Cmd.none )
+            ( { model | keyboard = keyboard, shift = shift }, pushUrl model.navigationKey model.melody shift )
 
         ToggleHelp ->
             ( { model | showHelp = not model.showHelp }, Cmd.none )
@@ -508,22 +524,31 @@ playNote note =
         ]
 
 
-normalizeMelody : List Int -> List Int
+normalizeMelody : List Int -> ( Maybe Int, List Int )
 normalizeMelody melody =
     melody
         |> List.head
         |> Maybe.map
             (\first ->
                 if first == 1 then
-                    melody
+                    ( Nothing, melody )
 
                 else
-                    List.map (\i -> modBy (List.length defaultKeyboard) (i - first) + 1) melody
+                    ( (if first - 1 > 6 then
+                        -6 + (first - 7)
+
+                       else
+                        first
+                            - 1
+                      )
+                        |> Just
+                    , List.map (\i -> modBy (List.length defaultKeyboard) (i - first) + 1) melody
+                    )
             )
-        |> Maybe.withDefault melody
+        |> Maybe.withDefault ( Nothing, melody )
 
 
-deserialzeMelody : String -> List Int
+deserialzeMelody : String -> ( Maybe Int, List Int )
 deserialzeMelody s =
     let
         tokens =
@@ -547,7 +572,7 @@ deserialzeMelody s =
         normalizeMelody notes
 
     else
-        []
+        ( Nothing, [] )
 
 
 serializeMelody : List Int -> String
@@ -564,26 +589,37 @@ main =
         { init =
             \_ url navKey ->
                 let
-                    melody =
+                    ( melody, shift ) =
                         { url | path = "" }
                             |> Url.Parser.parse
-                                (Url.Parser.query (Url.Parser.Query.string "melody"))
-                            |> Maybe.andThen identity
-                            |> Maybe.map deserialzeMelody
-                            |> Maybe.withDefault []
+                                (Url.Parser.query
+                                    (Url.Parser.Query.map2
+                                        Tuple.pair
+                                        (Url.Parser.Query.string "melody")
+                                        (Url.Parser.Query.int "shift")
+                                    )
+                                )
+                            |> Maybe.map
+                                (\( mMelody, mShift ) ->
+                                    mMelody
+                                        |> Maybe.map deserialzeMelody
+                                        |> Maybe.map (\( mMelodyShift, m ) -> ( m, mMelodyShift |> Maybe.withDefault (mShift |> Maybe.withDefault 0) ))
+                                        |> Maybe.withDefault ( [], mShift |> Maybe.withDefault 0 )
+                                )
+                            |> Maybe.withDefault ( [], 0 )
                 in
                 ( { melody = melody
-                  , keyboard = defaultKeyboard
+                  , keyboard = defaultKeyboard |> shiftKeyboard shift
                   , navigationKey = navKey
                   , synthState = Stopped
-                  , shift = 0
+                  , shift = shift
                   , showHelp = False
                   }
                 , if List.isEmpty melody then
                     Cmd.none
 
                   else
-                    pushUrl navKey melody
+                    pushUrl navKey melody shift
                 )
         , view =
             view
